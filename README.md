@@ -1,12 +1,26 @@
+<h1 align="center">
+
 ![](assets/logo.png)
 
-[![NPM](https://img.shields.io/npm/v/@rocketseat/unform.svg)](https://www.npmjs.com/package/@rocketseat/unform)
+</h1>
+
+<h3 align="center">
+Create ReactJS uncontrolled form structures with nested fields, validations and much more! 🚀
+</h3>
+
+<div align="center">
+
+[![npm](https://img.shields.io/npm/v/@rocketseat/unform.svg?color=%237159c1)](https://www.npmjs.com/package/@rocketseat/unform)<space><space>
+[![Travis (.org)](https://img.shields.io/travis/rocketseat/unform.svg?color=%237159c1)](https://travis-ci.org/Rocketseat/unform)<space><space>
+[![Coverage Status](https://img.shields.io/coveralls/github/Rocketseat/unform.svg?color=%237159c1)](https://coveralls.io/github/Rocketseat/unform?branch=master)
+
+</div>
 
 ## Overview
 
 Unform is a performance focused library that helps you creating beautiful forms in React with the power of uncontrolled components performance and React Hooks.
 
-## Main advantages
+## Key features
 
 - Beautiful syntax;
 - React Hooks 😍;
@@ -39,13 +53,24 @@ yarn add @rocketseat/unform
 
 - [Guides](#guides)
   - [Basics](#basics)
+  - [Reset Form](#reset-form)
   - [Nested fields](#nested-fields)
   - [Initial data](#initial-data)
   - [Validation](#validation)
+  - [Manipulate data](#manipulate-data)
+  - [Custom Elements](#custom-elements)
+    - [React Select](#react-select)
+    - [React Datepicker](#react-datepicker)
+- [Contributing](#contributing)
+  - [Contribution Guidelines](#contributing-guide)
+  - [Code of Conduct](#code-of-conduct)
+- [License](#license)
 
 ## Guides
 
 ### Basics
+
+Unform exposes three default form elements: `<Input />`, `<Select />` and `<Textarea />`. Currently, `<Select />` element does not support multiple values, you can use [React Select](#react-select) example to achieve that.
 
 ```js
 import React from "react";
@@ -61,6 +86,28 @@ function App() {
      *   password: "123456"
      * }
      */
+  };
+
+  return (
+    <Form onSubmit={handleSubmit}>
+      <Input name="email" />
+      <Input name="password" type="password" />
+
+      <button type="submit">Sign in</button>
+    </Form>
+  );
+}
+```
+
+### Reset form
+
+```js
+import React from "react";
+import { Form, Input } from "@rocketseat/unform";
+
+function App() {
+  function handleSubmit(data, { resetForm }) {
+    resetForm();
   };
 
   return (
@@ -166,13 +213,186 @@ function App() {
 }
 ```
 
-## Contribute
+### Manipulate data
 
-1. Fork it
-2. Create your feature branch (git checkout -b my-new-feature)
-3. Commit your changes (git commit -am 'Add some feature')
-4. Push to the branch (git push origin my-new-feature)
-5. Create new Pull Request
+```js
+import React, { useState } from "react";
+import { Form, Input } from "@rocketseat/unform";
+import * as Yup from 'yup';
+
+const schema = Yup.object().shape({
+  name: Yup.string().required(),
+  email: Yup.string().email().required(),
+  password: Yup.string().when('$updatePassword', {
+    is: true,
+    then: Yup.string().min(4).required(),
+    otherwise: Yup.string().strip(true)
+  }),
+})
+
+function App() {
+  const [updatePassword, setUpdatePassword] = useState(false);
+
+  const initialData = {
+    name: 'John Doe',
+    email: 'johndoe@example.com',
+  }
+
+  function handleSubmit(data) {};
+
+  return (
+    <Form
+      schema={schema}
+      initialData={initialData}
+      context={{ updatePassword }}
+      onSubmit={handleSubmit}
+    >
+      <Input name="name" />
+      <Input name="email" />
+
+      <input
+        type="checkbox"
+        name="Update Password"
+        checked={updatePassword}
+        onChange={e => setUpdatePassword(e.target.checked)}
+      />
+
+      <Input name="password" type="password" />
+
+      <button type="submit">Save</button>
+    </Form>
+  );
+}
+```
+
+## Custom elements
+
+Sometimes we need to use third-party component in our forms. But don't you worry, Unform has your back! You can do that via `useField` which provides all the resources you need to use your component with Unform.
+
+Below are some examples with [react-select](https://github.com/JedWatson/react-select) and [react-datepicker](https://github.com/Hacker0x01/react-datepicker/).
+
+### React select
+
+```js
+import React, { useRef, useEffect } from "react";
+import Select from "react-select";
+
+import { useField } from "@rocketseat/unform";
+
+export default function ReactSelect({
+  name,
+  label,
+  options,
+  multiple,
+  ...rest
+}) {
+  const ref = useRef(null);
+  const { fieldName, registerField, defaultValue, error } = useField(name);
+
+  function parseSelectValue(selectValue) {
+    if (!multiple) {
+      return selectValue ? selectValue.id : "";
+    }
+
+    return selectValue ? selectValue.map(option => option.id) : [];
+  }
+
+  useEffect(() => {
+    registerField({
+      name: fieldName,
+      ref: ref.current,
+      path: "state.value",
+      parseValue: parseSelectValue,
+      clearValue: selectRef => {
+        selectRef.select.clearValue();
+      }
+    });
+  }, [ref.current, fieldName]);
+
+  function getDefaultValue() {
+    if (!defaultValue) return null;
+
+    if (!multiple) {
+      return options.find(option => option.id === defaultValue);
+    }
+
+    return options.filter(option => defaultValue.includes(option.id));
+  }
+
+  return (
+    <>
+      {label && <label htmlFor={fieldName}>{label}</label>}
+
+      <Select
+        name={fieldName}
+        aria-label={fieldName}
+        options={options}
+        isMulti={multiple}
+        defaultValue={getDefaultValue()}
+        ref={ref}
+        getOptionValue={option => option.id}
+        getOptionLabel={option => option.title}
+        {...rest}
+      />
+
+      {error && <span>{error}</span>}
+    </>
+  );
+}
+```
+
+### React datepicker
+
+```js
+import React, { useRef, useEffect, useState } from "react";
+import ReactDatePicker from "react-datepicker";
+
+import { useField } from "@rocketseat/unform";
+
+import "react-datepicker/dist/react-datepicker.css";
+
+export default function DatePicker({ name }) {
+  const ref = useRef(null);
+  const { fieldName, registerField, defaultValue, error } = useField(name);
+  const [selected, setSelected] = useState(defaultValue);
+
+  useEffect(() => {
+    registerField({
+      name: fieldName,
+      ref: ref.current,
+      path: "props.selected",
+      clearValue: pickerRef => {
+        pickerRef.clear();
+      }
+    });
+  }, [ref.current, fieldName]);
+
+  return (
+    <>
+      <ReactDatePicker
+        name={fieldName}
+        selected={selected}
+        onChange={date => setSelected(date)}
+        ref={ref}
+      />
+      {error && <span>{error}</span>}
+    </>
+  );
+}
+
+```
+
+## Contributing
+
+Thanks for being interested on making this package better. We encourage everyone to help improving this project with some new features, bug fixes and performance issues. Please take a little bit of your time to read our guides, so this process can be faster and easier.
+
+### Contribution Guidelines
+
+Take a moment to read about our [Contribution Guidelines](/.github/CONTRIBUTING.md) so you can understand how to submit an issue, commit and create pull requests.
+
+### Code of Conduct
+
+We expect you to follow our [Code of Conduct](/.github/CODE_OF_CONDUCT.md). You can read it to understand what kind of behaviour will and will not be tolerated.
 
 ## License
 
